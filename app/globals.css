@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #F7F7F7;
+    --card: #FFFFFF;
+    --text: #1E1E1E;
+    --primary: #800020;
+    --primary-dark: #5A0016;
+    --primary-light: #A0002A;
+  }
+
+  .dark {
+    --background: #121212;
+    --card: #1E1E1E;
+    --text: #F7F7F7;
+  }
+
+  body {
+    @apply bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark transition-colors duration-300;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
