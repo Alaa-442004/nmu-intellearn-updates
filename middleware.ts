@@ -12,6 +12,7 @@ const PUBLIC_PREFIXES = [
   "/meeting",
   "/video",
   "/exam-proctoring",
+  "/camera",
 ];
 
 const STUDENT_PREFIXES = [

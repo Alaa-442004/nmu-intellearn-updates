@@ -18,6 +18,10 @@ import {
   gradeExamSubmission,
   saveExamResult,
 } from "@/lib/exam-result-storage";
+import {
+  AIExamProctor,
+  INTEGRITY_TYPES,
+} from "@/components/proctor";
 
 import { proctorUrl } from "@/lib/config/proctor";
 
@@ -43,6 +47,8 @@ export default function ExamPage({
   const [proctorSuspicious, setProctorSuspicious] = useState(false);
 
   const [proctorMessage, setProctorMessage] =
+    useState<string | null>(null);
+  const [proctorWarning, setProctorWarning] =
     useState<string | null>(null);
 
   const lockedRef = useRef(false);
@@ -298,74 +304,6 @@ export default function ExamPage({
     };
   }, [lockExam, proctorSuspicious]);
 
-  // ================= CAMERA PROCTOR =================
-
-  useEffect(() => {
-    let poll: ReturnType<
-      typeof setInterval
-    > | null = null;
-
-    let cancelled = false;
-
-    const start = async () => {
-      try {
-        await fetch(
-          proctorUrl("start-proctor"),
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body: JSON.stringify({
-              camera_index: 0,
-            }),
-          }
-        );
-      } catch {
-        return;
-      }
-
-      poll = setInterval(async () => {
-        try {
-          const res = await fetch(
-            proctorUrl("status")
-          );
-
-          const data = await res.json();
-
-          if (cancelled) return;
-
-          if (data?.suspicious) {
-            lockExam(
-              data?.last_message ||
-                "Camera violation detected."
-            );
-
-            if (poll) clearInterval(poll);
-          }
-        } catch {}
-      }, 1500);
-    };
-
-    start();
-
-    return () => {
-      cancelled = true;
-
-      if (poll) clearInterval(poll);
-
-      fetch(
-        proctorUrl("stop-proctor"),
-        {
-          method: "POST",
-        }
-      ).catch(() => {});
-    };
-  }, [params.id, lockExam]);
-
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
 
@@ -446,6 +384,35 @@ export default function ExamPage({
   const isFirstQuestion = currentQuestion === 0;
 
   const isLowTime = timeRemaining < 5 * 60;
+  const isExamActive =
+    !proctorSuspicious && timeRemaining > 0;
+
+  const handleAiWarning = useCallback(
+    (_type: string, message: string) => {
+      setProctorWarning(message);
+    },
+    []
+  );
+
+  const handleAiViolation = useCallback(
+    (type: string, message: string) => {
+      if (type === INTEGRITY_TYPES.TAB_SWITCH) {
+        forceExitExam(message);
+        return;
+      }
+      lockExam(message);
+    },
+    [forceExitExam, lockExam]
+  );
+
+  useEffect(() => {
+    if (!proctorWarning) return;
+    const timer = setTimeout(
+      () => setProctorWarning(null),
+      3000
+    );
+    return () => clearTimeout(timer);
+  }, [proctorWarning]);
 
   const goToPrevious = () => {
     if (proctorSuspicious || isFirstQuestion) return;
@@ -459,6 +426,26 @@ export default function ExamPage({
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="fixed bottom-4 right-4 z-30 w-[340px] max-w-[calc(100vw-2rem)]">
+        <AIExamProctor
+          enabled={isExamActive}
+          showPreview
+          monitorTabSwitch
+          monitorFullscreen
+          onWarning={handleAiWarning}
+          onViolation={handleAiViolation}
+          className="shadow-lg"
+        />
+      </div>
+
+      {proctorWarning && !proctorSuspicious && (
+        <div className="fixed top-24 right-4 z-40 max-w-sm pointer-events-none">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 shadow-md dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-100">
+            {proctorWarning}
+          </div>
+        </div>
+      )}
+
       {proctorSuspicious && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-900 rounded-xl p-6 max-w-lg w-full border border-gray-200 dark:border-gray-700">
